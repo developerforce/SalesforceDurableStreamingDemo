@@ -1,0 +1,90 @@
+<apex:page controller="DurablePushTopicStreamingController" action="{!getOrCreatePushChannel}">
+     <apex:includeScript value="{!$Resource.jquery}"/>
+    <script>
+        var $j = jQuery.noConflict();
+        
+        function getBaseAccountSobjectUrl() {
+            return window.location.protocol+'//'+window.location.hostname+ (null != window.location.port ? (':'+window.location.port) : '') +
+                    '/services/data/v37.0/sobjects/Account/'
+        }
+        
+        function generateEvents(msgInputId, sessionId) {
+            var payload = {};
+            payload.name = document.getElementById(msgInputId).value;
+            
+            var createResult = $j.ajax({
+                async: false,
+                url: getBaseAccountSobjectUrl(),
+                headers: {
+                    'Authorization': 'OAuth ' + sessionId
+                },
+                type: "POST",
+                data: JSON.stringify(payload),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json"
+            });
+            
+            if (createResult.status == 201) {
+                updateAccount(payload, JSON.parse(createResult.responseText).id, sessionId);
+            }
+        }
+        
+        function updateAccount(payload, accountId, sessionId) {
+            payload.name = payload.name + '_UPDATED';
+            var updateResult = $j.ajax({
+                async: false,
+                url: getBaseAccountSobjectUrl() + accountId,
+                headers: {
+                    'Authorization': 'OAuth ' + sessionId
+                },
+                type: "PATCH",
+                data: JSON.stringify(payload),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json"
+            });
+            
+            if (updateResult.status == 204) {
+                deleteAccount(accountId, sessionId);
+            }
+        }
+        
+        function deleteAccount(accountId, sessionId) {
+            return $j.ajax({
+                async: false,
+                url: getBaseAccountSobjectUrl() + accountId,
+                headers: {
+                    'Authorization': 'OAuth ' + sessionId
+                },
+                type: "DELETE",
+                contentType: "application/json; charset=utf-8",
+                dataType: "json"
+            });
+        }
+        
+        function sendPostRequest(payload, sessionId) {
+
+        }
+        
+    </script>
+    <apex:pageBlock >
+        <apex:pageBlockSection title="Replay Settings">
+            <apex:form >
+                Channel: &nbsp;<strong><apex:outputText label="streaming push topic" value="{!channel}"/></strong><br/>
+                Replay From Id: <apex:inputText label="replay from" value="{!replayFrom}"/><br/>
+                (-2 = earliest, -1 = no replay)<br/>
+                <apex:commandButton reRender="StreamingReplay" value="Update Subscription"/>
+            </apex:form>
+        </apex:pageBlockSection>
+        <apex:pageBlockSection title="Generate DML Events">
+            <apex:form >
+                New Account Name: <apex:inputText id="accountName" label="name"/><br/>
+                <apex:commandButton onclick="generateEvents('{!$Component.accountName}', '{!$Api.Session_ID}'); return false;" value="Create, Update, Delete New Account" />
+            </apex:form>
+        </apex:pageBlockSection>    
+    </apex:pageBlock>
+    <apex:pageBlock title="Notifications">
+        <apex:outputPanel id="StreamingReplay" >
+            <c:DurablePushTopicEventDisplay channel="{!channel}" replayFrom="{!replayFrom}" />
+        </apex:outputPanel>
+    </apex:pageBlock>
+</apex:page>

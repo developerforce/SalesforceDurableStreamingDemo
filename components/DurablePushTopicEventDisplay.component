@@ -1,0 +1,65 @@
+<apex:component >
+    <apex:includeScript value="{!$Resource.cometd}"/>
+    <apex:includeScript value="{!$Resource.jquery}"/>
+    <apex:includeScript value="{!$Resource.json2}"/>
+    <apex:includeScript value="{!$Resource.jquery_cometd}"/>
+    <apex:includeScript value="{!$Resource.cometdReplayExtension}"/>
+    
+    
+    <apex:attribute name="channel" id="channel" description="Streaming PushTopic Channel" type="String" required="true"/>
+    <apex:attribute name="replayFrom" id="replayFrom" description="Event Id to Replay From" type="Integer" required="true"/>
+
+    <script type="text/javascript">
+    var cometd;
+    (function($){
+         $(document).ready(function() {
+             var REPLAY_FROM = 'replayFrom';
+             var channel = '{!channel}';
+
+            cometd = $.cometd;
+
+            // ensure extension isn't already registered
+            if (cometd.getExtension(REPLAY_FROM) != null) {
+                 cometd.unregisterExtension(REPLAY_FROM, replayExtension);                 
+             }
+
+            // register Durable PushTopic Streaming replayFrom extension
+             var replayExtension = new cometdReplayExtension();
+             replayExtension.setChannel(channel);
+             replayExtension.setReplay('{!replayFrom}');
+             cometd.registerExtension(REPLAY_FROM, replayExtension);
+
+             // Connect to the CometD endpoint
+             cometd.init({
+                url: window.location.protocol+'//'+window.location.hostname+ (null != window.location.port ? (':'+window.location.port) : '') +'/cometd/37.0/',
+                requestHeaders: { Authorization: 'OAuth {!$Api.Session_ID}'}
+            });
+
+            // Subscribe to a topic. JSON-encoded update will be returned in the callback
+            cometd.subscribe(channel, function(message) {
+                $('#content').append('<p>Notification ' +
+                     'on channel: ' + JSON.stringify(message.channel) + '<br>' +
+                     'Replay Id: ' + JSON.stringify(message.data.event.replayId) + '<br>' + 
+                     'Type: ' + JSON.stringify(message.data.event.type) + '<br>' + 
+                     'SObject data: ' + JSON.stringify(message.data.sobject) + '<br>' + 
+                     'Full message: ' + JSON.stringify(message) + '</p>');
+             });
+         });
+    })(jQuery)
+
+    function disconnect() {
+        if (cometd) {
+            cometd.disconnect();
+        }
+    }    
+    window.onbeforeunload = disconnect;
+    
+    </script>
+    
+    <body>
+         <div id="content">
+             <strong>Received notifications should appear here...</strong>
+         </div>
+    </body>
+    
+</apex:component>

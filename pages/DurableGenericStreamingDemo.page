@@ -1,0 +1,51 @@
+<apex:page controller="DurableGenericStreamingController">
+     <apex:includeScript value="{!$Resource.jquery}"/>
+    <script>
+        var $j = jQuery.noConflict();
+        function generateEvents(msgInputId, numMsgInputId, channelId, sessionId) {
+            var pushEventsPayload = {};
+            var pushEvents = [];
+            for (var i=0; i < parseInt(document.getElementById(numMsgInputId).value); i++) {
+                var event = {};
+                event.payload = document.getElementById(msgInputId).value;
+                event.userIds = [];
+                pushEvents.push(event);
+            }
+            pushEventsPayload.pushEvents = pushEvents;
+                    
+            $j.ajax({
+                url: window.location.protocol+'//'+window.location.hostname+ (null != window.location.port ? (':'+window.location.port) : '') +
+                    '/services/data/v37.0/sobjects/StreamingChannel/'+ channelId + '/push',
+                headers: {
+                    'Authorization': 'OAuth ' + sessionId
+                },
+                type: "POST",
+                data: JSON.stringify(pushEventsPayload),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json"
+            });
+        }
+    </script>
+    <apex:pageBlock >
+        <apex:pageBlockSection title="Replay Settings">
+            <apex:form >
+                Channel: &nbsp;<strong><apex:outputText label="streaming channel" value="{!channel}"/></strong>
+                (id: &nbsp;<apex:outputText label="streaming channel id" value="{!channelId}"/>)<br/>
+                Replay From Id: <apex:inputText label="replay from" value="{!replayFrom}"/>&nbsp;(-2 = earliest, -1 = no replay)<br/>
+                <apex:commandButton reRender="StreamingReplay" value="Update Subscription"/>
+            </apex:form>
+        </apex:pageBlockSection>
+        <apex:pageBlockSection title="Generate New Events">
+            <apex:form >
+                Message: <apex:inputText id="eventMessage" label="message"/><br/>
+                Number of Events: <apex:inputText id="numEvents" label="number of events"/><br/>
+                <apex:commandButton onclick="generateEvents('{!$Component.eventMessage}', '{!$Component.numEvents}', '{!channelId}', '{!$Api.Session_ID}'); return false;" value="Generate" />
+            </apex:form>
+        </apex:pageBlockSection>    
+    </apex:pageBlock>
+    <apex:pageBlock title="Notifications">
+        <apex:outputPanel id="StreamingReplay" >
+            <c:DurableGenericEventDisplay channel="{!channel}" replayFrom="{!replayFrom}" />
+        </apex:outputPanel>
+    </apex:pageBlock>
+</apex:page>
