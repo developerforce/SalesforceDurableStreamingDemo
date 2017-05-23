@@ -11,44 +11,148 @@
 
     <script type="text/javascript">
     var cometd;
+    var subscribedToChannel;
+    var isExtensionEnabled;
+    var metaConnectListener;
+    var metaDisconnectListener;
+    var metaHandshakeListener;
+    var metaSubscribeListener;
+    var metaUnSubscribeListener
+    var metaUnSucessfulListener;
+    var REPLAY_FROM_KEY = 'replay';
     (function($){
          $(document).ready(function() {
-             var REPLAY_FROM = 'replayFrom';
-             var channel = '{!channel}';
+         
+         $('#content').append('<br>');
 
-            cometd = $.cometd;
+         var REPLAY_FROM = 'replayFrom';
+        var channel = '{!channel}';
 
-            // ensure extension isn't already registered
-            if (cometd.getExtension(REPLAY_FROM) != null) {
-                 cometd.unregisterExtension(REPLAY_FROM, replayExtension);                 
-             }
+        cometd = $.cometd;
+    
+        // ensure extension isn't already registered
+        if (cometd.getExtension(REPLAY_FROM) != null) {                     
+            cometd.unregisterExtension(REPLAY_FROM, replayExtension);                               
+        }
+        
+        // register Durable PushTopic Streaming replayFrom extension
+        var replayExtension = new cometdReplayExtension();
+        replayExtension.setChannel(channel);
+        replayExtension.setReplay('{!replayFrom}');
+        if(isExtensionEnabled) {
+            replayExtension.setExtensionEnabled(isExtensionEnabled);
+        }
+        cometd.registerExtension(REPLAY_FROM, replayExtension); 
 
-            // register Durable PushTopic Streaming replayFrom extension
-             var replayExtension = new cometdReplayExtension();
-             replayExtension.setChannel(channel);
-             replayExtension.setReplay('{!replayFrom}');
-             cometd.registerExtension(REPLAY_FROM, replayExtension);
+        // unsubscribe if you have already subscribed
+        if(subscribedToChannel) {
+            cometd.unsubscribe(subscribedToChannel, null, function(unsubscribeReply) {
+                subscribedToChannel = subscribe(channel); 
+            });
+        }
 
-             // Connect to the CometD endpoint
-             cometd.init({
+
+        var _connected = false;
+        if(!metaConnectListener) {
+            metaConnectListener = cometd.addListener('/meta/connect', function(message) {        
+                if (cometd.isDisconnected()) {
+                    $('#content').append('Disconnected: '+JSON.stringify(message)+'<br><br>');
+                    return;
+                }
+          
+                var wasConnected = _connected;                
+                _connected = message.successful;
+                
+                if (!wasConnected && _connected) {
+                    $('#content').append('DEBUG: Connection Successful : '+JSON.stringify(message)+'<br><br>');                    
+                } else if (wasConnected && !_connected) {
+                    $('#content').append('DEBUG: Disconnected from the server'+JSON.stringify(message)+'<br><br>');
+                }
+            }); 
+        }   
+
+        if(!metaDisconnectListener) {
+            metaDisconnectListener = cometd.addListener('/meta/disconnect', function(message) {  
+                $('#content').append('DEBUG: /meta/disconnect message: '+JSON.stringify(message)+' <br><br>');
+            });
+        }
+        
+        if(!metaHandshakeListener) {
+            metaHandshakeListener = cometd.addListener('/meta/handshake', function(message) {
+                if (message.successful) {
+                    $('#content').append('<br><br> DEBUG: Handshake Successful: '+JSON.stringify(message)+' <br><br>');                            
+                    
+                    if (message.ext && message.ext[REPLAY_FROM_KEY] == true) {
+                        isExtensionEnabled = true;
+                    }                    
+                    subscribedToChannel = subscribe(channel);
+                } else
+                    $('#content').append('DEBUG: Handshake Unsuccessful: '+JSON.stringify(message)+' <br><br>');
+            });
+        }
+
+        if(!metaSubscribeListener) {
+            metaSubscribeListener = cometd.addListener('/meta/subscribe', function(message) {  
+                if (message.successful) {
+                    $('#content').append('DEBUG: Subscribe Successful '+channel+': '+JSON.stringify(message)+' <br><br>');
+                } else {
+                    $('#content').append('DEBUG: Subscribe Unsuccessful '+channel+': '+JSON.stringify(message)+' <br><br>');                
+                }    
+            });
+        }
+
+                    
+        if(!metaUnSubscribeListener) {
+            metaUnSubscribeListener = cometd.addListener('/meta/unsubscribe', function(message) {  
+                if (message.successful) {
+                    $('#content').append('DEBUG: Unsubscribe Successful '+JSON.stringify(message)+' <br><br>');
+                } else {
+                    $('#content').append('DEBUG: Unsubscribe Unsuccessful '+JSON.stringify(message)+' <br><br>');                
+                }
+            });    
+        }                    
+                    
+        // notifies any failures
+        if(!metaUnSucessfulListener) {
+            metaUnSucessfulListener = cometd.addListener('/meta/unsuccessful', function(message) {  
+                $('#content').append('DEBUG:  /meta/unsuccessful Error: '+JSON.stringify(message)+' <br><br>');
+            });
+        }
+        
+        cometd.websocketEnabled = false;
+
+        // Connect to the CometD endpoint
+         cometd.configure({
                 url: window.location.protocol+'//'+window.location.hostname+ (null != window.location.port ? (':'+window.location.port) : '') +'/cometd/37.0/',
                 requestHeaders: { Authorization: 'OAuth {!$Api.Session_ID}'}
             });
+            
+        cometd.handshake();
 
-            // Subscribe to a topic. JSON-encoded update will be returned in the callback
-            cometd.subscribe(channel, function(message) {
-                $('#content').append('<p>Notification ' +
-                     'on channel: ' + JSON.stringify(message.channel) + '<br>' +
-                     'Replay Id: ' + JSON.stringify(message.data.event.replayId) + '<br>' + 
-                     'Type: ' + JSON.stringify(message.data.event.type) + '<br>' + 
-                     'SObject data: ' + JSON.stringify(message.data.sobject) + '<br>' + 
-                     'Full message: ' + JSON.stringify(message) + '</p>');
-             });
-         });
+ });
     })(jQuery)
+
+    function subscribe(channel) {
+        // Subscribe to a topic. JSON-encoded update will be returned in the callback
+        return cometd.subscribe(channel, function(message) {
+            var div = document.getElementById('content');
+            div.innerHTML = div.innerHTML + '<p>Notification ' +
+            'on channel: ' + JSON.stringify(message.channel) + '<br>' +
+            'Replay Id: ' + JSON.stringify(message.data.event.replayId) + '<br>' + 
+            'Type: ' + JSON.stringify(message.data.event.type) + '<br>' + 
+            'SObject data: ' + JSON.stringify(message.data.sobject) + '<br>' + 
+            'Full message: ' + JSON.stringify(message) + '</p><br>';
+        });
+    }
 
     function disconnect() {
         if (cometd) {
+            cometd.removeListener(metaConnectListener);
+            cometd.removeListener(metaDisconnectListener);
+            cometd.removeListener(metaHandshakeListener);
+            cometd.removeListener(metaSubscribeListener);
+            cometd.removeListener(metaUnSubscribeListener);
+            cometd.unsubscribe(subscribedToChannel);
             cometd.disconnect();
         }
     }    
