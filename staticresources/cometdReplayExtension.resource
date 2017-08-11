@@ -5,7 +5,11 @@ var cometdReplayExtension = function() {
 	var _extensionEnabled;
 	var _replay;
 	var _channel;
-	
+
+	this.setExtensionEnabled = function(extensionEnabled) {
+		_extensionEnabled = extensionEnabled;
+	}
+
 	this.setReplay = function (replay) {
 		_replay = parseInt(replay, 10);
 	}
