@@ -27,7 +27,13 @@ var cometdReplayExtension = function() {
 			if (message.ext && message.ext[REPLAY_FROM_KEY] == true) {
 				_extensionEnabled = true;
 			}
+		} else if (message.channel === _channel) {
+			if (message.data && message.data.event && message.data.event.replayId) {
+				_replay = message.data.event.replayId;
+			}
 		}
+
+
 	}
 	
 	this.outgoing = function(message) {
