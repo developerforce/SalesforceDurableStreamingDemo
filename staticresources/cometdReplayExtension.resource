@@ -30,8 +30,6 @@ var cometdReplayExtension = function() {
 		} else if (message.channel === _channel && message.data && message.data.event && message.data.event.replayId) {
 			_replay = message.data.event.replayId;
 		}
-
-
 	}
 	
 	this.outgoing = function(message) {
