@@ -2,7 +2,9 @@
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
     <types>
         <members>DurableGenericStreamingController</members>
+        <members>DurableGenericStreamingControllerTest</members>
         <members>DurablePushTopicStreamingController</members>
+        <members>DurablePushTopicStreamingControllerTest</members>
         <name>ApexClass</name>
     </types>
     <types>
