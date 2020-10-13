@@ -34,7 +34,7 @@ var cometdReplayExtension = function() {
 	
 	this.outgoing = function(message) {
 		if (message.channel === '/meta/subscribe') {
-			if (_extensionEnabled) {
+			if (_extensionEnabled && message.subscription === _channel) {
 				if (!message.ext) { message.ext = {}; }
 
 				var replayFromMap = {};
